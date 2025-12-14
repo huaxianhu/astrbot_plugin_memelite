@@ -10,10 +10,16 @@ try:
 except ImportError as e:
     MEME_GENERATOR_AVAILABLE = False
     IMPORT_ERROR = str(e)
-    # Provide dummy types for type checking
-    Meme = None  # type: ignore
-    get_memes = None  # type: ignore
-    __version__ = "0.0.0"
+    # Provide dummy values - set version high to avoid incorrect is_py_version detection
+    __version__ = "999.0.0"
+    # Type stubs for when meme_generator is not available
+    from typing import TYPE_CHECKING
+    if TYPE_CHECKING:
+        from meme_generator import Meme as MemeType
+        Meme = MemeType
+    else:
+        Meme = type("Meme", (), {})  # Create a dummy class for runtime
+    get_memes = lambda: []  # type: ignore
 
 from astrbot import logger
 from astrbot.core.config.astrbot_config import AstrBotConfig
