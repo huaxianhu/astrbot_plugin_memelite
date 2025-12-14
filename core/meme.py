@@ -3,8 +3,17 @@ import io
 from dataclasses import dataclass, field
 from typing import Literal
 
-from meme_generator import Meme, get_memes
-from meme_generator.version import __version__
+try:
+    from meme_generator import Meme, get_memes
+    from meme_generator.version import __version__
+    MEME_GENERATOR_AVAILABLE = True
+except ImportError as e:
+    MEME_GENERATOR_AVAILABLE = False
+    IMPORT_ERROR = str(e)
+    # Provide dummy types for type checking
+    Meme = None  # type: ignore
+    get_memes = None  # type: ignore
+    __version__ = "0.0.0"
 
 from astrbot import logger
 from astrbot.core.config.astrbot_config import AstrBotConfig
@@ -28,6 +37,18 @@ class MemeManager:
         self.meme_keywords: list[str] = []
         self._memes_loaded = False
 
+        if not MEME_GENERATOR_AVAILABLE:
+            logger.error("=" * 60)
+            logger.error("meme-generator 导入失败！")
+            logger.error(f"错误信息: {IMPORT_ERROR}")
+            logger.error("请尝试以下解决方案:")
+            logger.error("1. 确保已安装 meme-generator: pip install meme-generator")
+            logger.error("2. 如果已安装，尝试重新安装: pip uninstall meme-generator && pip install meme-generator")
+            logger.error("3. 检查是否缺少系统依赖 (Linux): sudo apt-get install -y libegl1 libgles2 libgl1")
+            logger.error("4. 查看详细文档: https://github.com/MeetWq/meme-generator")
+            logger.error("=" * 60)
+            return
+
         if self.is_py_version:
             from meme_generator.download import check_resources
             from meme_generator.utils import run_sync, render_meme_list
@@ -46,21 +67,37 @@ class MemeManager:
         """加载meme列表和关键词"""
         if self._memes_loaded:
             return
+        if not MEME_GENERATOR_AVAILABLE:
+            logger.error("无法加载memes: meme-generator 未正确安装")
+            return
         try:
             self.memes = get_memes()
+            if not self.memes:
+                logger.warning("未找到任何meme，可能是资源未下载")
+                logger.info("请等待资源下载完成，或手动下载资源")
+                return
             self.meme_keywords = [
                 k
                 for m in self.memes
                 for k in (m.keywords if self.is_py_version else m.info.keywords)
             ]
             self._memes_loaded = True
-            logger.info(f"成功加载 {len(self.memes)} 个meme")
+            logger.info(f"成功加载 {len(self.memes)} 个meme，共 {len(self.meme_keywords)} 个关键词")
+        except AttributeError as e:
+            logger.error(f"加载meme失败 (属性错误): {e}")
+            logger.error("这可能是因为 meme-generator 资源未完全下载")
+            logger.info("请等待资源下载完成后重启插件")
+            self.memes = []
+            self.meme_keywords = []
         except Exception as e:
             logger.error(f"加载meme失败: {e}")
             self.memes = []
             self.meme_keywords = []
 
     async def check_resources(self):
+        if not MEME_GENERATOR_AVAILABLE:
+            logger.error("跳过资源检查: meme-generator 未正确安装")
+            return
         if not self.conf["is_check_resources"]:
             logger.info("跳过资源检查，直接加载memes...")
             self._load_memes()
