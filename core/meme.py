@@ -110,6 +110,8 @@ class MemeManager:
             return
         logger.info("开始检查memes资源...")
         try:
+            # Python version (< 0.2.0): check_resources is already async
+            # Rust version (>= 0.2.0): check_resources_in_background is sync, needs threading
             if self.is_py_version:
                 await self.check_resources_func()
             else:
