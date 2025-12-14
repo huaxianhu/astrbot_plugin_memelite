@@ -24,6 +24,9 @@ class MemeManager:
     def __init__(self, config: AstrBotConfig, collect: ParamsCollector):
         self.conf = config
         self.collect = collect
+        self.memes: list[Meme] = []
+        self.meme_keywords: list[str] = []
+        self._memes_loaded = False
 
         if self.is_py_version:
             from meme_generator.download import check_resources
@@ -38,32 +41,58 @@ class MemeManager:
             self.render_meme_list = render_meme_list
             self.check_resources_func = check_resources_in_background
             self.MemeImage = MemeImage
-        self.memes: list[Meme] = get_memes()
-        self.meme_keywords = [
-            k
-            for m in self.memes
-            for k in (m.keywords if self.is_py_version else m.info.keywords)
-        ]
+
+    def _load_memes(self):
+        """加载meme列表和关键词"""
+        if self._memes_loaded:
+            return
+        try:
+            self.memes = get_memes()
+            self.meme_keywords = [
+                k
+                for m in self.memes
+                for k in (m.keywords if self.is_py_version else m.info.keywords)
+            ]
+            self._memes_loaded = True
+            logger.info(f"成功加载 {len(self.memes)} 个meme")
+        except Exception as e:
+            logger.error(f"加载meme失败: {e}")
+            self.memes = []
+            self.meme_keywords = []
 
     async def check_resources(self):
         if not self.conf["is_check_resources"]:
+            logger.info("跳过资源检查，直接加载memes...")
+            self._load_memes()
             return
         logger.info("开始检查memes资源...")
-        if self.is_py_version:
-            asyncio.create_task(self.check_resources_func())
-        else:
-            asyncio.create_task(asyncio.to_thread(self.check_resources_func))
+        try:
+            if self.is_py_version:
+                await self.check_resources_func()
+            else:
+                await asyncio.to_thread(self.check_resources_func)
+            logger.info("资源检查完成，开始加载memes...")
+        except Exception as e:
+            logger.warning(f"资源检查失败: {e}，尝试直接加载memes...")
+        self._load_memes()
 
     def find_meme(self, keyword: str) -> Meme | None:
+        if not self._memes_loaded:
+            logger.warning("Memes尚未加载")
+            return None
         for meme in self.memes:
             keywords = meme.keywords if self.is_py_version else meme.info.keywords
             if keyword == meme.key or keyword in keywords:
                 return meme
 
     def is_meme_keyword(self, meme_name: str) -> bool:
+        if not self._memes_loaded:
+            return False
         return meme_name in self.meme_keywords
 
     def match_meme_keyword(self, text: str, fuzzy_match: bool) -> str | None:
+        if not self._memes_loaded:
+            return None
         if fuzzy_match:
             # 模糊匹配：检查关键词是否在消息字符串中
             keyword = next((k for k in self.meme_keywords if k in text), None)
@@ -75,6 +104,9 @@ class MemeManager:
         return keyword
 
     async def render_meme_list_image(self) -> bytes | None:
+        if not self._memes_loaded:
+            logger.warning("Memes尚未加载，无法渲染列表")
+            return None
         if self.is_py_version:
             meme_list = [(m, MemeProperties(labels=[])) for m in self.memes]
             return self.render_meme_list(
