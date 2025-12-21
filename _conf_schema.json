@@ -33,6 +33,11 @@
         "description": "meme生成的超时时长",
         "type": "int",
         "hint": "meme生成超时，单位秒",
+        "slider": {
+            "min": 10,
+            "max": 120,
+            "step": 5
+        },
         "default": 15
     },
     "memes_disabled_list": {

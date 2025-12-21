@@ -3,7 +3,7 @@ import asyncio
 import astrbot.core.message.components as Comp
 from astrbot import logger
 from astrbot.api.event import filter
-from astrbot.api.star import Context, Star, register
+from astrbot.api.star import Context, Star
 from astrbot.core import AstrBotConfig
 from astrbot.core.platform import AstrMessageEvent
 from astrbot.core.star.filter.event_message_type import EventMessageType
@@ -13,7 +13,6 @@ from .core.param import ParamsCollector
 from .utils import compress_image
 
 
-@register("astrbot_plugin_memelite", "Zhalslar", "...", "...")
 class MemePlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
